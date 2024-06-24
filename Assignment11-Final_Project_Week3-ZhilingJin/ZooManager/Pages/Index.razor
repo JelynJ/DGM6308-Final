@@ -1,0 +1,404 @@
+﻿@page "/"
+@using ZooManager
+@implements IDisposable
+
+<style>
+    .game-cell {
+        width: 80px;
+        height: 80px;
+        font-size: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid #ddd;
+        position: relative;
+        padding: 5px;
+    }
+
+    .animal-details {
+        font-size: 10px;
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+    }
+
+    button {
+        width: 75px;
+        height: 75px;
+        font-size: 50px;
+    }
+
+        button.sm {
+            display: inline-flex;
+            width: 50px;
+            height: 50px;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+        }
+
+    .river {
+        background-color: lightblue;
+    }
+
+    .player-info {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    .animal-info {
+        font-size: 10px;
+        text-align: center;
+        position: absolute;
+        bottom: 2px;
+        left: 0;
+        right: 0;
+    }
+
+    .selected {
+        border: 2px solid yellow;
+    }
+
+    .valid-move {
+        background-color: rgba(0, 255, 0, 0.3);
+    }
+</style>
+
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <h1>Animal Chess</h1>
+        </div>
+    </div>
+
+    @if (Game.CurrentPhase == Game.GamePhase.Setup)
+    {
+        <div class="row">
+            <div class="col">
+                <h2>Please select the board size:</h2>
+                <button class="btn btn-primary" @onclick="() => SetBoardSize(5)">5x5</button>
+                <button class="btn btn-primary" @onclick="() => SetBoardSize(7)">7x7</button>
+            </div>
+        </div>
+    }
+    else if (Game.CurrentPhase == Game.GamePhase.Placement)
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <h3>Player @Game.CurrentPlayer.Id placing pieces</h3>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="useAIPlacement" id="useAIPlacement">
+                    <label class="form-check-label" for="useAIPlacement">
+                        Use AI random placement
+                    </label>
+                </div>
+                @if (useAIPlacement)
+                {
+                    <button class="btn btn-primary" @onclick="AIPlaceAnimals">AI Random Placement</button>
+                }
+                else
+                {
+                    <p>Please select the type of piece to place:</p>
+                    @foreach (var animalType in Game.GetAvailableAnimalTypes(Game.CurrentPlayer))
+                    {
+                        <button class="btn btn-primary m-1" @onclick="() => SelectAnimalType(animalType)">
+                            @animalType
+                        </button>
+                    }
+                }
+
+            </div>
+        </div>
+
+        <!-- Board rendering -->
+        <div class="row">
+            <div class="col">
+                <table align="center">
+                    @for (var y = 0; y < Game.numCellsY; y++)
+                    {
+                        <tr>
+                            @for (var x = 0; x < Game.numCellsX; x++)
+                            {
+                                var zone = Game.animalZones[y][x]; var location = new Point
+                                { x = x, y = y };
+                                <td>
+                                    <div @onclick="() => PlaceSelectedAnimal(location)" class="game-cell @(zone.isRiver ? " river"
+                            : "" ) @(IsValidPlacementLocation(location) ? "valid-placement" : "" )">
+                                        @if (zone.occupant != null)
+                                        {
+                                            <span>@zone.occupant.emoji</span>
+                                            @if (zone.occupant is Animal animal)
+                                            {
+                                                <div class="animal-info">
+                                                    HP:@animal.healthPoints/ATK:@animal.attackPower
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </table>
+            </div>
+        </div>
+    }
+    else if (Game.CurrentPhase == Game.GamePhase.Playing || Game.CurrentPhase == Game.GamePhase.SquirrelAbility)
+    {
+        <!-- Player information area -->
+        <div class="row">
+            @foreach (var player in new[] { Game.Player1, Game.Player2 })
+            {
+                <div class="col-6 player-info">
+                    <h2>Player @player.Id</h2>
+                    <p>King status: @(player.King != null ? "Alive" : "Defeated")</p>
+                    <p>Remaining pieces: @player.Pieces.Count</p>
+                    <p>Animal types: @string.Join(", ", player.AssignedAnimalTypes)</p>
+                </div>
+            }
+        </div>
+
+        <!-- Current player and turn information -->
+        <div class="row">
+            <div class="col">
+                <h3>Current turn: Player @Game.CurrentPlayer.Id</h3>
+                @if (Game.CurrentPhase == Game.GamePhase.SquirrelAbility)
+                {
+                    <p>Squirrel is using its special ability, please select two targets</p>
+                }
+            </div>
+        </div>
+
+        <!-- Game board -->
+        <div class="row">
+            <div class="col">
+                <table align="center">
+                    @for (var y = 0; y < Game.numCellsY; y++)
+                    {
+                        <tr>
+                            @for (var x = 0; x < Game.numCellsX; x++)
+                            {
+                                var zone = Game.animalZones[y][x];
+                                <td>
+                                    <div @onclick="@(() => HandleZoneClick(zone))"
+                                         class="game-cell @(zone.isRiver ? " river" : "" )
+            @(IsSelected(zone) ? "selected" : "" )
+            @(IsValidMove(zone, new Point { x=x, y=y }) ? "valid-move" : "" )">
+                                        @if (zone.occupant != null)
+                                        {
+                                            <span>@zone.occupant.emoji</span>
+                                            @if (zone.occupant is Animal animal)
+                                            {
+                                                <div class="animal-info">
+                                                    HP:@animal.healthPoints/ATK:@animal.attackPower
+                                                    @{
+                                                        var effectDescription = animal.GetEffectDescription();
+                                                        if (!string.IsNullOrEmpty(effectDescription))
+                                                        {
+                                                            <br />
+                                                            <span>Effects: @effectDescription</span>
+                                                        }
+                                                    }
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </table>
+            </div>
+        </div>
+
+        <!-- Special ability and skip turn buttons -->
+        <div class="row mt-3">
+            <div class="col">
+                @if (Game.GetSelectedAnimal() != null && Game.CurrentPhase != Game.GamePhase.SquirrelAbility)
+                {
+                    <button class="btn btn-primary" @onclick="UseSpecialAbility"
+                            disabled="@(!CanUseSpecialAbility(Game.GetSelectedAnimal()))">
+                        Use Special Ability
+                    </button>
+                }
+                <button class="btn btn-secondary" @onclick="Game.SkipTurn"
+                        disabled="@(Game.CurrentPhase == Game.GamePhase.SquirrelAbility)">
+                    Skip Turn
+                </button>
+            </div>
+        </div>
+    }
+    else if (Game.CurrentPhase == Game.GamePhase.GameOver)
+    {
+        <div class="row">
+            <div class="col">
+                <h2>Game Over</h2>
+                <p>Winner: Player @(Game.Player1.King != null ? Game.Player1.Id : Game.Player2.Id)</p>
+                <button class="btn btn-primary" @onclick="RestartGame">Restart Game</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool useAIPlacement = false;
+    private string selectedAnimalType;
+    private List<Point> validMoves = new List<Point>();
+
+    protected override void OnInitialized()
+    {
+        Game.SetUpGame();
+        Game.GameStateChanged += UpdateUI;
+    }
+
+    private void SetBoardSize(int size)
+    {
+        Game.SetBoardSize(size);
+        Game.StartGame();
+        StateHasChanged();
+    }
+
+    private bool IsSelected(Zone zone)
+    {
+        return Game.IsAnimalSelected(zone.location);
+    }
+
+    private bool IsValidMove(Zone zone, Point point)
+    {
+        var selectedAnimal = Game.GetSelectedAnimal();
+        if (selectedAnimal == null)
+            return false;
+
+        // Check if the current point is in the valid moves list
+        return validMoves.Any(m => m.x == point.x && m.y == point.y);
+    }
+
+    private void SelectAnimalType(string animalType)
+    {
+        selectedAnimalType = animalType;
+        Console.WriteLine($"Selected piece type: {animalType}");
+    }
+
+    private void AIPlaceAnimals()
+    {
+        Game.AIPlaceAnimals(Game.CurrentPlayer);
+        if (IsPlacementComplete())
+        {
+            Game.CurrentPhase = Game.GamePhase.Playing;
+        }
+        else
+        {
+            // Modification: Use the method in the Game class to switch the current player
+            Game.SwitchCurrentPlayer();
+        }
+        // Modification: Remove direct event invocation
+        StateHasChanged();
+    }
+
+    private void PlaceSelectedAnimal(Point location)
+    {
+        Console.WriteLine($"Attempting to place {selectedAnimalType} at ({location.x}, {location.y})");
+        if (selectedAnimalType != null)
+        {
+            if (Game.PlaceAnimal(Game.CurrentPlayer, selectedAnimalType, location))
+            {
+                Console.WriteLine($"Successfully placed {selectedAnimalType} at ({location.x}, {location.y})");
+                selectedAnimalType = null;
+                if (IsPlacementComplete())
+                {
+                    Game.CurrentPhase = Game.GamePhase.Playing;
+                    Console.WriteLine("Placement phase complete, entering playing phase");
+                }
+                else
+                {
+                    Game.SwitchCurrentPlayer();
+                    Console.WriteLine($"Switched to player {Game.CurrentPlayer.Id}");
+                }
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine($"Unable to place {selectedAnimalType} at ({location.x}, {location.y})");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Please select a piece type to place first");
+        }
+    }
+
+    private bool IsPlacementComplete()
+    {
+        int requiredPieces = Game.numCellsX <= 5 ? 3 : 6; return Game.Player1.Pieces.Count(p => !(p is CatKing) && !(p is
+            MouseKing)) == requiredPieces &&
+            Game.Player2.Pieces.Count(p => !(p is CatKing) && !(p is MouseKing)) == requiredPieces;
+    }
+
+    private void UseSpecialAbility()
+    {
+        var animal = Game.GetSelectedAnimal();
+        if (animal != null)
+        {
+            Game.UseSpecialAbility(animal);
+            StateHasChanged();
+        }
+    }
+
+    private bool CanUseSpecialAbility(Animal animal)
+    {
+        return animal != null && !animal.HasUsedSpecialAbility && animal.CanMoveAndAttackThisTurn;
+    }
+
+    private void HandleZoneClick(Zone zone)
+    {
+        if (Game.CurrentPhase == Game.GamePhase.Placement)
+        {
+            PlaceSelectedAnimal(zone.location);
+        }
+        else if (Game.CurrentPhase == Game.GamePhase.SquirrelAbility)
+        {
+            Game.AddSquirrelTarget(zone.occupant as Animal);
+        }
+        else
+        {
+            Game.ZoneClick(zone);
+        }
+        StateHasChanged();
+    }
+    private bool IsValidPlacementLocation(Point location)
+    {
+        if (Game.CurrentPhase != Game.GamePhase.Placement || selectedAnimalType == null)
+        {
+            return false;
+        }
+        return Game.IsValidPlacement(Game.CurrentPlayer, location);
+    }
+    private void UpdateUI()
+    {
+        var selectedAnimal = Game.GetSelectedAnimal();
+        if (selectedAnimal != null)
+        {
+            validMoves = Game.GetValidMoves(selectedAnimal);
+            Game.DebugPrintValidMoves(selectedAnimal); // Debugging
+        }
+        else
+        {
+            validMoves.Clear();
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RestartGame()
+    {
+        Game.ResetGame();
+        Game.SetUpGame();
+    }
+
+    public void Dispose()
+    {
+        Game.GameStateChanged -= UpdateUI;
+    }
+}
