@@ -1,0 +1,50 @@
+﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css'); /* Import the Open Iconic Bootstrap CSS file */
+
+html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; /* Set the font family for HTML and body elements */
+}
+
+a, .btn-link {
+    color: #0366d6; /* Set the color for links and button links */
+}
+
+.btn-primary {
+    color: #fff; /* Set the text color for primary buttons */
+    background-color: #1b6ec2; /* Set the background color for primary buttons */
+    border-color: #1861ac; /* Set the border color for primary buttons */
+}
+
+.content {
+    padding-top: 1.1rem; /* Add top padding to the content area */
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050; /* Add a green outline to valid and modified input fields (except checkboxes) */
+}
+
+.invalid {
+    outline: 1px solid red; /* Add a red outline to invalid input fields */
+}
+
+.validation-message {
+    color: red; /* Set the color for validation messages to red */
+}
+
+#blazor-error-ui {
+    background: lightyellow; /* Set the background color for the Blazor error UI */
+    bottom: 0; /* Position the error UI at the bottom of the screen */
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2); /* Add a box shadow to the error UI */
+    display: none; /* Initially hide the error UI */
+    left: 0; /* Position the error UI at the left edge of the screen */
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem; /* Add padding to the error UI */
+    position: fixed; /* Make the error UI position fixed */
+    width: 100%; /* Set the width of the error UI to 100% */
+    z-index: 1000; /* Set a high z-index value for the error UI */
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer; /* Change the cursor to a pointer on hover */
+        position: absolute; /* Position the dismiss link absolutely */
+        right: 0.75rem; /* Position the dismiss link from the right edge */
+        top: 0.5rem; /* Position the dismiss link from the top edge */
+    }
